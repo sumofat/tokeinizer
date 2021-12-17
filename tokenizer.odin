@@ -74,38 +74,42 @@ is_whitespace_no_end_of_line :: proc(r : rune) -> bool{
 }
 
 
-is_single_line_comment_c_style :: proc(r : rune,next_r : rune) -> bool{
+is_single_line_comment_c_style_rune :: proc(r : rune,next_r : rune) -> bool{
     return (r == '/' && next_r == '/')
 }
 
-is_single_line_comment_lisp_style :: proc(r : rune) -> bool{
+is_single_line_comment_lisp_style_rune :: proc(r : rune) -> bool{
     return (r == ';')
 }
 
-is_multi_line_comment_start_c_style :: proc(r : rune,next_r : rune)-> bool{
+is_multi_line_comment_start_c_style_rune :: proc(r : rune,next_r : rune)-> bool{
     return (r == '/' && next_r == '*')
 }
 
-is_multi_line_comment_end_c_style :: proc(r : rune,next_r : rune)-> bool{
+is_multi_line_comment_end_c_style_rune :: proc(r : rune,next_r : rune)-> bool{
     return (r == '*' && next_r == '/')
 }
 
 
-is_single_line_comment_c_style :: proc(r : Token,next_r : Token) -> bool{
+is_single_line_comment_c_style_token :: proc(r : Token,next_r : Token) -> bool{
     return (r.type == .BackwardSlash && next_r.type == .BackwardSlash)
 }
 
-is_single_line_comment_lisp_style :: proc(r : Token) -> bool{
+is_single_line_comment_lisp_style_token :: proc(r : Token) -> bool{
     return (r.type == .SemiColon)
 }
 
-is_multi_line_comment_start_c_style :: proc(r : Token,next_r : Token)-> bool{
+is_multi_line_comment_start_c_style_token :: proc(r : Token,next_r : Token)-> bool{
     return (r.type == .BackwardSlash && next_r.type == .Asterisk)
 }
 
-is_multi_line_comment_end_c_style :: proc(r : Token,next_r : Token)-> bool{
-    return (r.type == .Asterisk && next_r == .BackwardSlash)
+is_multi_line_comment_end_c_style_token :: proc(r : Token,next_r : Token)-> bool{
+    return (r.type == .Asterisk && next_r.type == .BackwardSlash)
 }
+
+is_single_line_comment_c_style :: proc{is_single_line_comment_c_style_rune,is_single_line_comment_c_style_token}
+is_single_line_comment_lisp_style :: proc{is_single_line_comment_lisp_style_rune,is_single_line_comment_lisp_style_token}
+
 
 is_comment_start :: proc(token : Token,other : Token) -> bool{
     return (token.type == .ForwardSlash && other.type == .Asterisk);
@@ -113,6 +117,39 @@ is_comment_start :: proc(token : Token,other : Token) -> bool{
 
 is_comment_end :: proc(token : Token,other : Token) -> bool{
     return (token.type == .Asterisk && other.type == .ForwardSlash);
+}
+
+eat_all_whitespace :: proc(tokenizer : ^Tokenizer, is_included_end_of_line_chars : bool){
+	if is_included_end_of_line_chars{
+		r := tokenizer.at
+		for is_whitespace(r){
+			r = advance_by_current(tokenizer)
+		}
+	}else{
+		temp_offset := tokenizer.offset
+		r := tokenizer.at
+		for is_whitespace_no_end_of_line(r){
+			r = advance_by_current(tokenizer)
+		}
+	}
+}
+
+current_rune :: proc(tokenizer : Tokenizer) -> (rune,int){
+	return utf8.decode_rune_in_string(tokenizer.src[tokenizer.offset:])
+}
+
+advance :: proc(tokenizer : ^Tokenizer,by : int){
+	tokenizer.offset += by
+	w : int
+	tokenizer.at,w = current_rune(tokenizer^)
+}
+
+advance_by_current :: proc(tokenizer : ^Tokenizer) -> rune{
+	r, w := utf8.decode_rune_in_string(tokenizer.src[tokenizer.offset:])
+	tokenizer.offset += w
+	next_r,next_w := current_rune(tokenizer^)
+	tokenizer.at = next_r
+	return tokenizer.at
 }
 
 get_token :: proc(tokenizer : ^Tokenizer) -> Token{
